@@ -2,6 +2,12 @@
 
 > Append a new entry whenever a real trade-off is decided. Newest on top.
 
+## 2026-07-16 — Skill ships one way (skill.zip), not two
+- Status: accepted
+- Context: The diagram has the skill shipping twice from one source dir — `@scope/skill` on npm for agents and CI, and `skill.zip` from GitHub Releases for manual upload into the Claude UI. We already replaced npm with NuGet for the code surfaces, but a skill is pure markdown, so a NuGet package is not its natural agent-facing channel either — nothing would `dotnet tool install` a folder of prose.
+- Decision: One source dir, `skills/velocity/`, packaged to `skill.zip` in phase 6 CI. The second channel is deferred until there's a consumer asking for it.
+- Consequences: Manual upload is the only install path for now. Adding a second package step later is cheap precisely because the source dir stays single — which is the part of the diagram's advice that actually mattered. Revisit if agents need to install the skill unattended.
+
 ## 2026-07-16 — Hand-rolled CLI arg parsing instead of System.CommandLine
 - Status: accepted
 - Context: The plan called for `System.CommandLine` (2.0.10 is now stable). The CLI has four commands.

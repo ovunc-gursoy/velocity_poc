@@ -72,6 +72,18 @@ Check("rejects a year outside the competition entirely, readably", () =>
     That(error.Contains("1930"), $"the message should tell the agent the valid range, got: {error}");
 });
 
+Check("SKILL.md's Germany claim still matches the data", () =>
+{
+    // The skill tells agents: four titles total, only 2014 under "Germany", the rest under
+    // "West Germany". Got this wrong once when writing it, so pin it — the skill is the agent's
+    // only warning about the name split, and a silently wrong one is worse than none.
+    var germany = WorldCupTools.GetTournaments(db, team: "Germany").Where(x => x.Winner == "Germany").ToList();
+    var westGermany = WorldCupTools.GetTournaments(db, team: "West Germany").Where(x => x.Winner == "West Germany").ToList();
+    That(germany.Count == 1 && germany[0].Year == 2014, $"expected exactly 2014 under 'Germany', got {germany.Count}");
+    That(westGermany.Count == 3, $"expected 3 titles under 'West Germany', got {westGermany.Count}");
+    That(germany.Count + westGermany.Count == 4, "the skill says four German titles in total");
+});
+
 Console.WriteLine("currency (live ECB rates via frankfurter.dev)");
 
 async Task CheckAsync(string name, Func<Task> assertion)
