@@ -104,6 +104,29 @@ npx skills add ovunc-gursoy/velocity_poc -s velocity
 
 Or upload `skills/velocity` as a `skill.zip` in the Claude UI.
 
+### Remote MCP as a claude.ai connector
+
+claude.ai connects from its own servers, so it needs a **public HTTPS URL** — `localhost`
+won't work. For a demo, tunnel the local server; for anything lasting, deploy it.
+
+```bash
+# 1. run the server (see Remote MCP above), then expose it — e.g. an account-less quick tunnel:
+cloudflared tunnel --url http://localhost:5199        # prints https://<random>.trycloudflare.com
+
+# 2. restart the server telling it its public identity (the resource id must match the tunnel URL):
+Mcp__Resource="https://<random>.trycloudflare.com" ASPNETCORE_ENVIRONMENT=Development \
+  dotnet run --project src/Velocity.Mcp.Server
+```
+
+Then in claude.ai: **Settings → Connectors → Add custom connector**, paste the tunnel URL, and
+sign in through Clerk when prompted. The server honors `X-Forwarded-*`, so the OAuth discovery
+URLs come out as the public `https` origin automatically.
+
+> **Exposure note:** a tunnel puts this on the public internet, which widens the audience gap
+> below. It stays low-risk *only* because the data is read-only and public and the Clerk instance
+> is a single-tenant dev one — a random Clerk user would get the World Cup tool and nothing more.
+> Don't tunnel anything with real data on this basis.
+
 ## Authentication & per-user tool access
 
 The remote server uses **Clerk** as an OAuth 2.1 + PKCE authorization server. The MCP client

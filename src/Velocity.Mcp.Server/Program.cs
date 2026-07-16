@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using ModelContextProtocol.AspNetCore.Authentication;
 using ModelContextProtocol.Authentication;
 using Velocity.Mcp.Core;
@@ -139,6 +140,20 @@ builder.Services
     .AddAuthorizationFilters();
 
 var app = builder.Build();
+
+// Behind a tunnel or reverse proxy (needed to reach this from claude.ai, which requires a public
+// HTTPS URL), honor X-Forwarded-Proto/Host so the OAuth URLs the SDK generates — the resource
+// metadata and the WWW-Authenticate pointer — come out as the public https origin, not http://localhost.
+// No proxy present => the headers are absent => this is a no-op, so localhost is unaffected.
+var forwardedHeaders = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+};
+// The tunnel's egress IP is unknown and variable, so we can't allowlist it. Acceptable for a PoC
+// demo; a real deployment terminates TLS itself or pins the proxy instead of trusting the header.
+forwardedHeaders.KnownNetworks.Clear();
+forwardedHeaders.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeaders);
 
 app.UseAuthentication();
 app.UseAuthorization();
