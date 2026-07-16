@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace Velocity.Mcp.Core;
@@ -31,13 +32,16 @@ public sealed class CurrencyTools
         string? date = null,
         CancellationToken cancellationToken = default)
     {
+        // Validation failures throw McpException, whose Message the SDK propagates to the caller.
+        // Any other exception type is replaced with a generic string, which would strip the very
+        // guidance an agent needs to correct its own call. Keep these messages agent-readable.
         if (amount <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(amount), amount, "Amount must be greater than zero.");
+            throw new McpException($"Amount must be greater than zero, but was {amount}.");
         }
 
-        from = NormaliseCode(from, nameof(from));
-        to = NormaliseCode(to, nameof(to));
+        from = NormaliseCode(from, "from");
+        to = NormaliseCode(to, "to");
 
         var onDate = ParseDate(date);
 
@@ -57,17 +61,17 @@ public sealed class CurrencyTools
 
         if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.UnprocessableEntity)
         {
-            throw new ArgumentException(
-                $"No rate available for {from} to {to}. Both must be currencies the ECB publishes; call with a known pair such as USD to EUR to check the service is reachable.");
+            throw new McpException(
+                $"No rate available for {from} to {to}. Both must be currencies the ECB publishes; a known pair such as USD to EUR will confirm the service is reachable.");
         }
         response.EnsureSuccessStatusCode();
 
         var payload = await response.Content.ReadFromJsonAsync<FrankfurterResponse>(cancellationToken)
-            ?? throw new InvalidOperationException("The rates service returned an empty response.");
+            ?? throw new McpException("The rates service returned an empty response.");
 
         if (!payload.Rates.TryGetValue(to, out var rate))
         {
-            throw new ArgumentException($"The rates service did not return a {to} rate for {from}.");
+            throw new McpException($"The rates service did not return a {to} rate for {from}.");
         }
 
         return new Conversion(
@@ -84,7 +88,7 @@ public sealed class CurrencyTools
         var trimmed = code?.Trim().ToUpperInvariant();
         if (string.IsNullOrEmpty(trimmed) || trimmed.Length != 3 || !trimmed.All(char.IsAsciiLetter))
         {
-            throw new ArgumentException($"'{code}' is not a 3-letter ISO 4217 currency code, e.g. 'USD'.", parameterName);
+            throw new McpException($"'{code}' is not a valid '{parameterName}' value. Use a 3-letter ISO 4217 currency code, e.g. 'USD'.");
         }
         return trimmed;
     }
@@ -97,11 +101,11 @@ public sealed class CurrencyTools
         }
         if (!DateOnly.TryParseExact(date.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
         {
-            throw new ArgumentException($"'{date}' is not a date in 'yyyy-MM-dd' format.", nameof(date));
+            throw new McpException($"'{date}' is not a date in 'yyyy-MM-dd' format, e.g. '2024-01-15'.");
         }
         if (parsed > DateOnly.FromDateTime(DateTime.UtcNow))
         {
-            throw new ArgumentOutOfRangeException(nameof(date), date, "Rate dates cannot be in the future.");
+            throw new McpException($"Rate date '{date}' is in the future. Omit the date to get the latest published rate.");
         }
         return parsed;
     }

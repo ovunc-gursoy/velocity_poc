@@ -8,7 +8,7 @@
 | Component | Responsibility | Key files | Status |
 |---|---|---|---|
 | `Velocity.Mcp.Core` | Tool contracts, validation, mapping, auth context. One implementation behind every surface. | `src/Velocity.Mcp.Core/` | **built** |
-| `Velocity.Mcp.Server` | Remote MCP, streamable HTTP. The only surface behind a network + OAuth boundary. | — | phase 2 |
+| `Velocity.Mcp.Server` | Remote MCP, streamable HTTP. The only surface behind a network + OAuth boundary. | `src/Velocity.Mcp.Server/Program.cs` | **built** |
 | `Velocity.Mcp.Local` | Local MCP over stdio, runs on the dev machine as the user. | — | phase 3 |
 | `Velocity.Mcp.Cli` | dotnet tool for scripts/CI. Also `mcp install` → writes/merges `.mcp.json`. | — | phase 3 |
 | Skill | Prompt + docs. Ships as `skill.zip` via GitHub Releases. No C#. | — | phase 4 |
@@ -25,7 +25,7 @@
 ## Cross-cutting concerns
 - **Auth:** none yet (deferred to phase 5). The trust boundary the diagram draws still holds by construction: Remote MCP is the only surface intended to sit behind network + OAuth; Skill, Local MCP and CLI run as the user with the user's own credentials.
 - **Logging / telemetry:** none yet. Nothing to observe until there's a host.
-- **Error handling:** tools throw `ArgumentException` / `ArgumentOutOfRangeException` on bad input; the MCP SDK maps thrown exceptions to tool errors. Messages are written for an agent to read and self-correct, not for a log.
+- **Error handling:** tools throw **`McpException`** on bad input. This is not a style preference: the SDK propagates `McpException.Message` to the caller and replaces every other exception type with a generic "An error occurred invoking 'x'", which would strip the guidance an agent needs to correct its own call. Messages are written for an agent to read and self-correct, not for a log. Corollary: never put anything sensitive in an `McpException` message — it crosses the trust boundary by design. Use any other exception type for failures the caller shouldn't see.
 - **Validation:** at the tool boundary, which is the trust boundary — MCP tool arguments are model-generated and untrusted. Currency codes, amounts and dates are checked before any upstream call. SQLite access is fully parameterised.
 
 ## Decisions in effect

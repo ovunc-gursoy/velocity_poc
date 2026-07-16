@@ -2,6 +2,12 @@
 
 > Append a new entry whenever a real trade-off is decided. Newest on top.
 
+## 2026-07-16 — Tool validation errors throw McpException, not ArgumentException
+- Status: accepted
+- Context: Phase 1 threw `ArgumentException` / `ArgumentOutOfRangeException` with messages written for an agent to self-correct. Driving the phase 2 host with a real MCP client showed the client only ever received `"An error occurred invoking 'convert_currency'."` — the SDK deliberately hides exception messages, propagating only `McpException.Message`, so nothing leaks by accident.
+- Decision: All caller-facing validation in core throws `McpException`. The self-check asserts on message *content*, not just exception type, so a regression to a silent generic error fails the check.
+- Consequences: Core's exception types are now dictated by the SDK's disclosure model, which is the right trade — the message is a real part of the tool interface, and an error an agent can't read is a dead end for it. The flip side is that `McpException` messages cross the trust boundary by construction: nothing sensitive may go in one. Any failure the caller shouldn't see must use a different exception type, which then surfaces as the generic string. Noted in architecture.md.
+
 ## 2026-07-16 — Core owns the MCP tool attributes; surfaces bind, never redefine
 - Status: accepted
 - Context: The diagram puts "tool contracts" in the core box and states surfaces never redefine them. The alternative is core exposing plain C# methods with each surface applying its own `[McpServerTool]` metadata.

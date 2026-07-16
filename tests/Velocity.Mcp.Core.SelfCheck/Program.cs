@@ -1,4 +1,5 @@
 using static Expect;
+using ModelContextProtocol;
 using Microsoft.Extensions.DependencyInjection;
 using Velocity.Mcp.Core;
 
@@ -63,14 +64,10 @@ Check("a wartime gap year is empty, not an error", () =>
     That(WorldCupTools.GetTournaments(db, year: 1943).Count == 0, "1943 had no tournament, so the result should be empty");
 });
 
-Check("rejects a year outside the competition entirely", () =>
+Check("rejects a year outside the competition entirely, readably", () =>
 {
-    try
-    {
-        WorldCupTools.GetTournaments(db, year: 5);
-        throw new Exception("expected a rejection for year 5");
-    }
-    catch (ArgumentOutOfRangeException) { }
+    var error = Throws(() => WorldCupTools.GetTournaments(db, year: 5));
+    That(error.Contains("1930"), $"the message should tell the agent the valid range, got: {error}");
 });
 
 Console.WriteLine("currency (live ECB rates via frankfurter.dev)");
@@ -110,34 +107,22 @@ await CheckAsync("same currency short-circuits without a call", async () =>
     That(result.Rate == 1m && result.Converted == 42.5m, "same-currency conversion must be identity");
 });
 
-await CheckAsync("rejects a malformed currency code", async () =>
+await CheckAsync("rejects a malformed currency code, readably", async () =>
 {
-    try
-    {
-        await CurrencyTools.ConvertAsync(httpClientFactory, 1m, "DOLLARS", "EUR");
-        throw new Exception("expected a rejection for 'DOLLARS'");
-    }
-    catch (ArgumentException) { }
+    var error = await ThrowsAsync(() => CurrencyTools.ConvertAsync(httpClientFactory, 1m, "DOLLARS", "EUR"));
+    That(error.Contains("ISO 4217") && error.Contains("from"), $"the message should name the bad parameter and the expected format, got: {error}");
 });
 
-await CheckAsync("rejects a non-positive amount", async () =>
+await CheckAsync("rejects a non-positive amount, readably", async () =>
 {
-    try
-    {
-        await CurrencyTools.ConvertAsync(httpClientFactory, 0m, "USD", "EUR");
-        throw new Exception("expected a rejection for a zero amount");
-    }
-    catch (ArgumentOutOfRangeException) { }
+    var error = await ThrowsAsync(() => CurrencyTools.ConvertAsync(httpClientFactory, 0m, "USD", "EUR"));
+    That(error.Contains("greater than zero"), $"the message should state the constraint, got: {error}");
 });
 
 await CheckAsync("reports an unknown-but-well-formed code clearly", async () =>
 {
-    try
-    {
-        await CurrencyTools.ConvertAsync(httpClientFactory, 1m, "USD", "ZZZ");
-        throw new Exception("expected a rejection for 'ZZZ'");
-    }
-    catch (ArgumentException) { }
+    var error = await ThrowsAsync(() => CurrencyTools.ConvertAsync(httpClientFactory, 1m, "USD", "ZZZ"));
+    That(error.Contains("ZZZ"), $"the message should name the offending currency, got: {error}");
 });
 
 Console.WriteLine();

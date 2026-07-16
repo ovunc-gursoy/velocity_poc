@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace Velocity.Mcp.Core;
@@ -21,9 +22,10 @@ public sealed class WorldCupTools
         [Description("Host nation, e.g. 'Mexico'. Matches on substring, so 'Japan' finds the 2002 tournament co-hosted by South Korea and Japan.")]
         string? host = null)
     {
+        // McpException so the message reaches the caller; the SDK hides every other exception type.
         if (year is < 1930 or > 2026)
         {
-            throw new ArgumentOutOfRangeException(nameof(year), year, "The World Cup has only been held between 1930 and 2026.");
+            throw new McpException($"No World Cup has been held in {year}. The tournament runs from 1930 to 2026.");
         }
 
         return db.Query(year, Clean(team), Clean(host));

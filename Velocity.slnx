@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Velocity.Mcp.Core/Velocity.Mcp.Core.csproj" />
+    <Project Path="src/Velocity.Mcp.Server/Velocity.Mcp.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Velocity.Mcp.Core.SelfCheck/Velocity.Mcp.Core.SelfCheck.csproj" />

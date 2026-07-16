@@ -21,7 +21,7 @@ PoC of the MCP Platform Architecture (`mcp-platform-architecture.pdf`): one shar
 
 ## Steps
 1. [x] **Phase 1 — core.** `Velocity.Mcp.Core` with both tools, SQLite World Cup, live FX, `AddVelocityCore()`, and a self-check. Done 2026-07-16, 13/13 checks pass.
-2. [ ] **Phase 2 — Remote MCP host.** `src/Velocity.Mcp.Server`, ASP.NET Minimal API, `ModelContextProtocol.AspNetCore` 1.4.1, streamable HTTP. Program.cs should be roughly: `AddVelocityCore()`, `AddMcpServer().WithHttpTransport().WithTools<WorldCupTools>().WithTools<CurrencyTools>()`, `MapMcp()`. No auth yet. Add a `/health` endpoint.
+2. [x] **Phase 2 — Remote MCP host.** `src/Velocity.Mcp.Server`, ASP.NET Minimal API, `ModelContextProtocol.AspNetCore` 1.4.1, streamable HTTP. Program.cs should be roughly: `AddVelocityCore()`, `AddMcpServer().WithHttpTransport().WithTools<WorldCupTools>().WithTools<CurrencyTools>()`, `MapMcp()`. No auth yet. Add a `/health` endpoint. Done 2026-07-16; verified against a live client (initialize, tools/list, both tools called, error paths).
 3. [ ] **Phase 3a — Local MCP (stdio).** `src/Velocity.Mcp.Local`, same binding as phase 2 but `WithStdioServerTransport()`. **Nothing may write to stdout** — stdout is the protocol channel. Route logs to stderr.
 4. [ ] **Phase 3b — CLI.** `src/Velocity.Mcp.Cli` as a dotnet tool (`PackAsTool`, command `velocity`). Subcommands: invoke each tool directly for scripts/CI, plus `velocity mcp install` / `velocity mcp remove` which write/merge/reverse the `.mcp.json` entry pointing at the phase-3a stdio binary. Merge into existing `.mcp.json` — never clobber a user's other servers. Use `System.CommandLine`.
 5. [ ] **Phase 4 — Skill.** `skills/velocity/SKILL.md` — prompt + docs describing the two tools. No C#. CI packages it to `skill.zip` for GitHub Releases.
@@ -59,3 +59,4 @@ PoC of the MCP Platform Architecture (`mcp-platform-architecture.pdf`): one shar
 - Phase 2: `curl` the health endpoint, then attach a real MCP client and confirm both tools list and execute.
 - Phase 3b: run `velocity mcp install` against a `.mcp.json` that already contains an unrelated server; confirm the existing entry survives and `remove` reverses cleanly.
 - Extend the self-check alongside any new logic. Asserts in the console app, no test framework unless asked.
+- **Tools must throw `McpException` for anything the caller should read.** Every other exception type is replaced by the SDK with a generic string. Assert on message content, not exception type. See ADR 2026-07-16.
