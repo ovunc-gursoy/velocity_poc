@@ -31,16 +31,52 @@ builder.Services
         options.TokenValidationParameters.ValidIssuer = authority;
         options.TokenValidationParameters.ValidateLifetime = true;
 
-        // ponytail: audience validation is off unless Clerk:Audience is configured, because Clerk
-        // does not document RFC 8707 resource binding and we have not yet confirmed what it puts in
-        // `aud`. This is a real gap, not a simplification: without audience binding, a token minted
-        // for a DIFFERENT MCP server on the same Clerk instance is accepted here (confused deputy).
-        // Tolerable only because this instance is a single-tenant dev PoC on localhost. Before any
-        // deployment: inspect a real token, set Clerk:Audience, and delete this branch.
+        // Audience validation is OFF, and cannot currently be turned on. Measured, not assumed:
+        // a real Clerk token from the PKCE flow carries no `aud` claim at all. Its claims are
+        // client_id, exp, iat, iss, jti, nbf, scope, sub. Clerk advertises no RFC 8707 resource
+        // indicators, so nothing binds a token to *this* resource server.
+        //
+        // Consequence: any token this Clerk instance issues is accepted here, whoever it was
+        // issued to. Dynamic client registration is public, so anyone can register a client and,
+        // with a user's consent, call these tools as that user — the consent screen says "profile
+        // and email", not "Velocity". That is a confused deputy, and it is open by design of the
+        // upstream, not by our choice.
+        //
+        // Safe only because: single-tenant dev instance, bound to localhost, read-only tools over
+        // public data. Do NOT deploy on this basis. Closing it needs one of:
+        //   - Clerk gaining resource indicators / a configurable audience, then set Clerk:Audience;
+        //   - disabling DCR, pre-registering one client, and allowlisting its client_id (costs
+        //     compatibility with MCP clients that require DCR);
+        //   - a gateway in front that enforces its own audience.
+        // Setting Clerk:Audience today rejects every token, since there is no aud to match.
         options.TokenValidationParameters.ValidateAudience = audience is not null;
         if (audience is not null)
         {
             options.TokenValidationParameters.ValidAudience = audience;
+        }
+
+        // Development-only: report what the authorization server actually puts in the token, so the
+        // audience decision above is made from evidence rather than assumption. Logs claim names and
+        // the aud/azp values only — never the raw token, which is a live credential.
+        if (builder.Environment.IsDevelopment())
+        {
+            options.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = context =>
+                {
+                    var claims = context.Principal?.Claims.ToList() ?? [];
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("Velocity.TokenDiagnostics");
+                    logger.LogInformation(
+                        "Token accepted. aud=[{Aud}] azp={Azp} iss={Iss} scopes={Scopes} allClaims=[{Names}]",
+                        string.Join(", ", claims.Where(c => c.Type is "aud").Select(c => c.Value)),
+                        claims.FirstOrDefault(c => c.Type is "azp")?.Value ?? "(none)",
+                        claims.FirstOrDefault(c => c.Type is "iss")?.Value ?? "(none)",
+                        claims.FirstOrDefault(c => c.Type is "scope" or "scp")?.Value ?? "(none)",
+                        string.Join(", ", claims.Select(c => c.Type).Distinct()));
+                    return Task.CompletedTask;
+                }
+            };
         }
     })
     .AddMcp(options =>

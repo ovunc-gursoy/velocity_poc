@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "velocity-remote": {
+      "type": "http",
+      "url": "http://localhost:5199"
+    }
+  }
+}
