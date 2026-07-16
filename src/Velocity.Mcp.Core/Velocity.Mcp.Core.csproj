@@ -6,6 +6,10 @@
 
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol" />
+    <!-- For the [Authorize] tool-access contract. netstandard2.0-compatible, so the console
+         surfaces (Local, CLI) reference it without pulling in the ASP.NET runtime. The attribute
+         is inert there — only the Remote host, which calls AddAuthorizationFilters, enforces it. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authorization" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="Microsoft.Extensions.Http" />

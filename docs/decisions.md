@@ -2,6 +2,12 @@
 
 > Append a new entry whenever a real trade-off is decided. Newest on top.
 
+## 2026-07-16 — Per-user tool access via [Authorize] in core + SDK authorization filters
+- Status: accepted
+- Context: Requirement — the currency tool is available only to specific users (an email allowlist); everyone else gets World Cup only. Two enforcement points matter: `tools/list` (hide it) and `tools/call` (refuse it). Hiding alone is not security. Also: Clerk access tokens carry no email, so identity for the check must be resolved out of band.
+- Decision: Annotate `CurrencyTools.ConvertAsync` with `[Authorize(Policy = FullAccessPolicy)]` in core, and enable the MCP SDK's `AddAuthorizationFilters()` in the Remote host, which enforces the policy for both list and call. The host defines the policy (email ∈ `Velocity:FullAccessEmails`) and resolves the email from Clerk's `userinfo` endpoint (cached, fail-closed). The allowlist is config, never committed.
+- Consequences: Core takes a dependency on `Microsoft.AspNetCore.Authorization` (netstandard2.0-compatible, so the console surfaces reference it without the ASP.NET runtime). The attribute is inert on Local MCP and CLI — correct, since those run as the user with no per-user gating — and enforced only where `AddAuthorizationFilters` is called. Putting the *policy name* in core and the *policy definition* in the host keeps the tool contract single-sourced (matches the diagram's "auth context in core") while letting each surface decide enforcement. An email is resolved via one extra network call per new subject, amortized by the cache; a userinfo outage degrades a privileged user to World Cup only rather than failing their whole session.
+
 ## 2026-07-16 — Clerk as authorization server; audience validation deferred with a known gap
 - Status: accepted (provisional — revisit before any deployment)
 - Context: Clerk is the chosen OAuth provider. Two findings shaped this: (1) Clerk has no custom scopes yet, only `openid`/`profile`/`email`/`public_metadata`/`private_metadata`/`user:org:read`, so a `velocity:tools` scope cannot exist; (2) Clerk does not document support for the RFC 8707 `resource` parameter, which is what binds an access token to a specific resource server. Clerk's own MCP helpers (`@clerk/mcp-tools`) are TypeScript-only and irrelevant to us — Clerk is a standard OAuth 2.1 AS issuing JWTs, so .NET's `JwtBearer` plus the MCP SDK's `AddMcp()` is all that's required.

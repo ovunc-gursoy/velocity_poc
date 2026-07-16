@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
@@ -13,7 +14,17 @@ public sealed class CurrencyTools
 {
     public const string HttpClientName = "frankfurter";
 
+    /// <summary>
+    /// Authorization policy a caller must satisfy to use the currency tool. The Remote MCP host
+    /// defines what satisfies it (which users); it is enforced only on surfaces that call
+    /// AddAuthorizationFilters. Local MCP and the CLI run as the user and do not gate per-user, so
+    /// the attribute is inert there. The World Cup tool carries no policy — it is open to any
+    /// authenticated caller.
+    /// </summary>
+    public const string FullAccessPolicy = "velocity:full-access";
+
     [McpServerTool(Name = "convert_currency")]
+    [Authorize(Policy = FullAccessPolicy)]
     [Description("""
         Convert an amount between currencies using European Central Bank reference rates.
         Rates are published once per working day, so this is not a live trading rate. The

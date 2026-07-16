@@ -29,6 +29,8 @@
   - **Dynamic Client Registration must be ON** (Clerk Dashboard → OAuth applications). Most MCP clients require it to self-register during the flow. Clerk force-enables the consent screen when DCR is on.
   - No custom scopes available yet. No documented RFC 8707 `resource` support — see the audience ADR.
   - Configure with `dotnet user-secrets set Clerk:Authority <issuer>` in `src/Velocity.Mcp.Server`. Never commit it; the repo is public.
+  - **Access tokens carry NO email** (only sub, client_id, scope, …), even with the email scope granted. Per-user authz resolves email from `{issuer}/oauth/userinfo` with the access token. Verified against a real token.
+  - **Per-user tool access:** `Velocity:FullAccessEmails` (user-secrets, array) = who gets the currency tool. Everyone else gets World Cup only. Enforced by `[Authorize]` in core + `AddAuthorizationFilters()` in the host. See the per-user ADR.
 
 ## Open questions
 - Hosting target for the Remote MCP surface: the diagram lists Azure Container Apps / Fly.io / Cloudflare. Not chosen.

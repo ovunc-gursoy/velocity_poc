@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using ModelContextProtocol.AspNetCore.Authentication;
 using ModelContextProtocol.Authentication;
 using Velocity.Mcp.Core;
+using Velocity.Mcp.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +17,12 @@ var authority = builder.Configuration["Clerk:Authority"]
 
 var audience = builder.Configuration["Clerk:Audience"];
 var resource = builder.Configuration["Mcp:Resource"] ?? "http://localhost:5199";
+
+// Callers whose Clerk email is in this list get the full tool set; everyone else gets only the
+// World Cup tool. Not hardcoded and not in the repo (public) — set it per environment, e.g.
+// 'dotnet user-secrets set "Velocity:FullAccessEmails:0" you@example.com'. Empty = nobody has full
+// access, so the currency tool is hidden from all callers (a safe, if surprising, default).
+var fullAccessEmails = builder.Configuration.GetSection("Velocity:FullAccessEmails").Get<string[]>() ?? [];
 
 builder.Services
     .AddAuthentication(options =>
@@ -55,29 +63,39 @@ builder.Services
             options.TokenValidationParameters.ValidAudience = audience;
         }
 
-        // Development-only: report what the authorization server actually puts in the token, so the
-        // audience decision above is made from evidence rather than assumption. Logs claim names and
-        // the aud/azp values only — never the raw token, which is a live credential.
-        if (builder.Environment.IsDevelopment())
+        // Per-user authorization needs the caller's email, which the token does not carry, so resolve
+        // it from Clerk's userinfo endpoint (cached) and attach it as a claim the policy below reads.
+        options.Events = new JwtBearerEvents
         {
-            options.Events = new JwtBearerEvents
+            OnTokenValidated = async context =>
             {
-                OnTokenValidated = context =>
+                var subject = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? context.Principal?.FindFirst("sub")?.Value;
+                var header = context.Request.Headers.Authorization.ToString();
+                var accessToken = header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                    ? header["Bearer ".Length..]
+                    : null;
+
+                if (subject is not null && accessToken is not null && context.Principal?.Identity is ClaimsIdentity identity)
                 {
-                    var claims = context.Principal?.Claims.ToList() ?? [];
-                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
-                        .CreateLogger("Velocity.TokenDiagnostics");
-                    logger.LogInformation(
-                        "Token accepted. aud=[{Aud}] azp={Azp} iss={Iss} scopes={Scopes} allClaims=[{Names}]",
-                        string.Join(", ", claims.Where(c => c.Type is "aud").Select(c => c.Value)),
-                        claims.FirstOrDefault(c => c.Type is "azp")?.Value ?? "(none)",
-                        claims.FirstOrDefault(c => c.Type is "iss")?.Value ?? "(none)",
-                        claims.FirstOrDefault(c => c.Type is "scope" or "scp")?.Value ?? "(none)",
-                        string.Join(", ", claims.Select(c => c.Type).Distinct()));
-                    return Task.CompletedTask;
+                    var userInfo = context.HttpContext.RequestServices.GetRequiredService<ClerkUserInfo>();
+                    var email = await userInfo.GetEmailAsync(subject, accessToken, context.HttpContext.RequestAborted);
+                    if (email is not null)
+                    {
+                        identity.AddClaim(new Claim("email", email));
+                    }
+
+                    if (builder.Environment.IsDevelopment())
+                    {
+                        context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                            .CreateLogger("Velocity.TokenDiagnostics")
+                            .LogInformation("Token accepted. sub={Sub} email={Email} fullAccess={Full}",
+                                subject, email ?? "(unresolved)",
+                                email is not null && fullAccessEmails.Contains(email, StringComparer.OrdinalIgnoreCase));
+                    }
                 }
-            };
-        }
+            }
+        };
     })
     .AddMcp(options =>
     {
@@ -90,14 +108,35 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // The World Cup tool carries no policy, so it is available to any authenticated caller.
+    // The currency tool requires this policy: an email claim matching the configured allowlist.
+    options.AddPolicy(CurrencyTools.FullAccessPolicy, policy =>
+        policy.RequireAssertion(context =>
+        {
+            var email = context.User.FindFirst("email")?.Value;
+            return email is not null && fullAccessEmails.Contains(email, StringComparer.OrdinalIgnoreCase);
+        }));
+});
+
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<ClerkUserInfo>();
+builder.Services.AddHttpClient(ClerkUserInfo.HttpClientName, client =>
+{
+    client.BaseAddress = new Uri(authority.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 builder.Services.AddVelocityCore();
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()
     .WithTools<WorldCupTools>()
-    .WithTools<CurrencyTools>();
+    .WithTools<CurrencyTools>()
+    // Enforces [Authorize] on tools for BOTH tools/list (hides unauthorized tools) and tools/call
+    // (rejects them). Without this the attribute is inert and every tool is listed and callable.
+    .AddAuthorizationFilters();
 
 var app = builder.Build();
 
