@@ -70,6 +70,35 @@ edit away.
   obtain and attach a user token. The backend does the validating and authorizing — identical code
   to what the Remote MCP already runs.
 
+## The required sequence: resource API first
+
+The steps below are ordered, not a menu. The order is forced by one fact:
+
+**A check that runs on the user's machine is a check the user can delete.** Today all four surfaces
+share the same *code* (core), but core runs **in-process** — the CLI links it, the Local MCP hosts
+it, both under the user's control. An `[Authorize]` check evaluated inside core is one the user can
+patch out, and the data it guards (public Frankfurter, local SQLite) is reachable without it
+anyway. So the shared thing cannot be shared *code*. It must be a shared **network resource** that
+holds the private data and does the enforcing itself — the one boundary a local user cannot edit
+around. That is the diagram's "Custom APIs" box, and it is why nothing else can come first.
+
+Hence:
+
+0. **Close the audience gap** (`docs/decisions.md`, 2026-07-16). The resource API will authorize
+   based on these Clerk tokens; while a token minted for another resource on the same instance is
+   still accepted, the API cannot safely trust one for anything private. This is the floor
+   everything else stands on — see the inherited caveat below.
+1. **Stand up the resource API** and move the private data behind it. Until this exists there is no
+   lock, only a door.
+2. **Enforce authorization at that API** — one policy, evaluated at the resource, identical for
+   every surface. This is the step that makes per-user access real instead of theater, because it
+   is the step the user cannot bypass.
+3. **Then wire the authentication flows.** Each surface's job shrinks to "obtain a user token and
+   carry it." Doing this *before* step 1 authenticates the user against nothing — a token proving
+   identity to a door with no lock.
+
+The phases below implement this sequence.
+
 ## Phased steps
 
 **Phase A — a resource worth protecting.** Stand up the backend API layer the diagram draws and we
