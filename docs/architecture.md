@@ -1,7 +1,7 @@
 # Architecture
 
 > Components, data flow, and decisions currently in effect. Update when structure changes.
-> Derived from `mcp-platform-architecture.pdf`. Phase 1 of 6 is built; the rest is planned shape.
+> Derived from `mcp-platform-architecture.pdf`. Phases 1-3 of 6 are built; the rest is planned shape.
 
 ## Components
 
