@@ -9,7 +9,8 @@
 ## Goal
 PoC of the MCP Platform Architecture (`mcp-platform-architecture.pdf`): one shared core library behind four surfaces, from one repo, exposing two tools (World Cup lookup, currency conversion).
 
-**Phase 1 is complete and verified** — core + both tools + self-check. This plan covers phases 2-6.
+**All phases complete.** Core + four surfaces + Clerk auth on the remote, all verified against live
+clients. Phase 6 (CI) was dropped as unnecessary for a PoC. See per-step notes below.
 
 ## Context / constraints
 - .NET 10, C#, ASP.NET Minimal APIs. SQLite for DB work. Any frontend: vanilla JS/HTML/CSS, no frameworks.
@@ -25,8 +26,8 @@ PoC of the MCP Platform Architecture (`mcp-platform-architecture.pdf`): one shar
 3. [x] **Phase 3a — Local MCP (stdio).** `src/Velocity.Mcp.Local`, same binding as phase 2 but `WithStdioServerTransport()`. **Nothing may write to stdout** — stdout is the protocol channel. Route logs to stderr. Done 2026-07-16; verified by driving it over a real stdin/stdout pipe — stdout stayed pure JSON-RPC.
 4. [x] **Phase 3b — CLI.** `src/Velocity.Mcp.Cli` as a dotnet tool (`PackAsTool`, command `velocity`). Subcommands: invoke each tool directly for scripts/CI, plus `velocity mcp install` / `velocity mcp remove` which write/merge/reverse the `.mcp.json` entry pointing at the phase-3a stdio binary. Merge into existing `.mcp.json` — never clobber a user's other servers. Done 2026-07-16. **Deviation: arg parsing is hand-rolled, not `System.CommandLine`** — see ADR.
 5. [x] **Phase 4 — Skill.** `skills/velocity/SKILL.md` — prompt + docs describing the two tools. No C#. CI packages it to `skill.zip` for GitHub Releases (phase 6). Done 2026-07-16; frontmatter and zip layout verified. **Deviation: single distribution channel, not the diagram's two** — see ADR.
-6. [ ] **Phase 5 — Auth.** OAuth 2.1 + PKCE on the Remote MCP surface only. Host validates access tokens via JWKS and never sees credentials; the MCP client runs the flow. **Provider not yet chosen — ask before starting.**
-7. [ ] **Phase 6 — CI.** GitHub Actions: tag → build → test → publish NuGet + attach `skill.zip` to the release.
+6. [x] **Phase 5 — Auth.** OAuth 2.1 + PKCE on the Remote MCP surface only, via **Clerk**. Host validates access tokens against Clerk's JWKS and never sees credentials; the MCP client runs the flow. Done 2026-07-16; verified end to end with a live client (discovery → PKCE → connected). Added per-user tool access (email allowlist gates the currency tool) and tunnel support for claude.ai. **Known gap: audience validation is off — Clerk tokens carry no `aud`; see the audience ADR.**
+7. ~~**Phase 6 — CI.**~~ Dropped. The PoC is complete; the skill installs via `npx skills add` and packages to `skill.zip` on demand, so tag→build→publish automation isn't needed. Revisit if this becomes a released product.
 
 ## Files in scope
 | Path | What changes |
@@ -35,7 +36,6 @@ PoC of the MCP Platform Architecture (`mcp-platform-architecture.pdf`): one shar
 | `src/Velocity.Mcp.Local/` | new — phase 3a |
 | `src/Velocity.Mcp.Cli/` | new — phase 3b |
 | `skills/velocity/` | done — phase 4 |
-| `.github/workflows/` | new — phase 6 |
 | `Directory.Packages.props` | add packages as needed |
 | `Velocity.slnx` | add each new project |
 | `docs/architecture.md`, `docs/decisions.md` | update in the same change as the code |
@@ -43,7 +43,7 @@ PoC of the MCP Platform Architecture (`mcp-platform-architecture.pdf`): one shar
 ## Delegation
 - Locate first with `@explore`: read `src/Velocity.Mcp.Core/` before touching anything — the binding pattern is the whole point.
 - Parallel (`@worker`, disjoint files): steps 2, 3a, 3b are independent once core is pinned. Step 5 is not — it modifies step 2's output.
-- Sequential: 4 after 3b (the skill documents the install flow). 6 last. 5 blocked on a provider decision.
+- Sequential: 4 after 3b (the skill documents the install flow). 5 blocked on a provider decision (Clerk, chosen).
 - `@review` the combined diff before finalizing.
 
 ## Out of scope / do NOT touch
