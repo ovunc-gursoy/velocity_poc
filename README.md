@@ -168,6 +168,12 @@ This is a PoC. It is honest about its limits — see the ADRs in
 Other productionizing work (HTTPS/deployment, rate limiting, telemetry) is deliberately out of
 scope for the PoC and listed in the architecture doc.
 
+**Securing the local surfaces** (CLI, Local MCP) is a common follow-up question. The short answer
+is that the remote's OAuth model does not transplant onto them — they run as the user, on the
+user's machine — and the real control is to move authorization to a shared, secured resource API
+that every surface reaches through. See [`docs/secure-local-surfaces.md`](docs/secure-local-surfaces.md)
+for the full reasoning and a phased plan. Not implemented; deferred by design.
+
 ## Notable design decisions
 
 The diagram is npm/TypeScript-shaped; this is .NET. Where they diverge, the reasoning is
