@@ -1,7 +1,7 @@
 # Architecture
 
 > Components, data flow, and decisions currently in effect. Update when structure changes.
-> Derived from `mcp-platform-architecture.pdf`. Phases 1-4 of 6 are built; the rest is planned shape.
+> Derived from `mcp-platform-architecture.pdf`. Phases 1-5 of 6 are built (phase 5 pending a live Clerk instance); the rest is planned shape.
 
 ## Components
 
@@ -28,7 +28,9 @@
 - Phase 1 talks to Frankfurter directly. The diagram routes core → Custom APIs (ASP.NET/APIM) → DBs/services; we have no domain API worth standing up yet, so core calls the upstream itself. Insert that layer when a second consumer or a non-trivial mapping appears — not before.
 
 ## Cross-cutting concerns
-- **Auth:** none yet (deferred to phase 5). The trust boundary the diagram draws still holds by construction: Remote MCP is the only surface intended to sit behind network + OAuth; Skill, Local MCP and CLI run as the user with the user's own credentials.
+- **Auth:** OAuth 2.1 + PKCE on `Velocity.Mcp.Server` only, with **Clerk** as the authorization server. The MCP client runs the flow; the host never sees credentials and only validates the access token's signature against Clerk's JWKS (`{authority}/.well-known/jwks.json`), which it discovers via `Authority`. A 401 carries `WWW-Authenticate: Bearer resource_metadata="..."` pointing at an RFC 9728 document at `/.well-known/oauth-protected-resource`; that is how a client discovers Clerk. `/health` is deliberately anonymous — a health probe that needs a token cannot report that auth is broken. Skill, Local MCP and CLI stay unauthenticated by design: they run as the user with the user's own credentials, exactly as the diagram's trust boundary describes.
+  - **Known gap:** audience validation is disabled unless `Clerk:Audience` is set. Clerk does not document RFC 8707 resource binding, so a token minted for another MCP server on the same Clerk instance would be accepted. Acceptable only for a single-tenant dev instance on localhost. See ADR.
+  - Clerk has no custom scopes yet, so authorization is "authenticated Clerk user", not per-tool consent.
 - **Logging / telemetry:** none yet. Nothing to observe until there's a host.
 - **Error handling:** tools throw **`McpException`** on bad input. This is not a style preference: the SDK propagates `McpException.Message` to the caller and replaces every other exception type with a generic "An error occurred invoking 'x'", which would strip the guidance an agent needs to correct its own call. Messages are written for an agent to read and self-correct, not for a log. Corollary: never put anything sensitive in an `McpException` message — it crosses the trust boundary by design. Use any other exception type for failures the caller shouldn't see.
 - **Validation:** at the tool boundary, which is the trust boundary — MCP tool arguments are model-generated and untrusted. Currency codes, amounts and dates are checked before any upstream call. SQLite access is fully parameterised.

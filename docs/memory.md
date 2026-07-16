@@ -25,8 +25,11 @@
   - Same-currency pair (`base == symbol`) returns HTTP 422; core short-circuits before calling.
   - Weekend/holiday dates silently roll back to the previous working day — the response's `date` is the authority, so we surface it as `RateDate`.
   - Unknown currency code returns HTTP 404 with `{"message":"not found"}`.
-- No auth provider yet. OAuth 2.1 + PKCE is phase 5.
+- **Clerk** — OAuth 2.1 authorization server for the Remote MCP surface only. Dev instance. Issuer format `https://verb-noun-00.clerk.accounts.dev`; JWKS at `{issuer}/.well-known/jwks.json`; AS metadata at `{issuer}/.well-known/oauth-authorization-server`. Tokens are JWTs by default.
+  - **Dynamic Client Registration must be ON** (Clerk Dashboard → OAuth applications). Most MCP clients require it to self-register during the flow. Clerk force-enables the consent screen when DCR is on.
+  - No custom scopes available yet. No documented RFC 8707 `resource` support — see the audience ADR.
+  - Configure with `dotnet user-secrets set Clerk:Authority <issuer>` in `src/Velocity.Mcp.Server`. Never commit it; the repo is public.
 
 ## Open questions
 - Hosting target for the Remote MCP surface: the diagram lists Azure Container Apps / Fly.io / Cloudflare. Not chosen.
-- OAuth provider for phase 5: Clerk / Auth0 / Okta / Entra ID / Keycloak. Not chosen.
+- What Clerk puts in the `aud` claim — determines whether audience validation can be turned on. Needs a real token to answer.

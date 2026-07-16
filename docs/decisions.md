@@ -2,6 +2,12 @@
 
 > Append a new entry whenever a real trade-off is decided. Newest on top.
 
+## 2026-07-16 — Clerk as authorization server; audience validation deferred with a known gap
+- Status: accepted (provisional — revisit before any deployment)
+- Context: Clerk is the chosen OAuth provider. Two findings shaped this: (1) Clerk has no custom scopes yet, only `openid`/`profile`/`email`/`public_metadata`/`private_metadata`/`user:org:read`, so a `velocity:tools` scope cannot exist; (2) Clerk does not document support for the RFC 8707 `resource` parameter, which is what binds an access token to a specific resource server. Clerk's own MCP helpers (`@clerk/mcp-tools`) are TypeScript-only and irrelevant to us — Clerk is a standard OAuth 2.1 AS issuing JWTs, so .NET's `JwtBearer` plus the MCP SDK's `AddMcp()` is all that's required.
+- Decision: Validate signature, issuer and lifetime. Validate audience only when `Clerk:Audience` is configured; leave it unset for the localhost PoC. Authorization means "authenticated Clerk user". The host fails to start if `Clerk:Authority` is missing, rather than silently running open.
+- Consequences: **Without audience binding this host would accept a token minted for a different MCP server on the same Clerk instance — a confused-deputy hole.** Tolerable strictly because the instance is single-tenant, in development, and bound to localhost. Before deploying anywhere: inspect a real Clerk token, confirm what lands in `aud`, set `Clerk:Audience`, and delete the conditional branch. Marked with a `ponytail:` comment at the validation site so it cannot be mistaken for a considered simplification.
+
 ## 2026-07-16 — Skill ships one way (skill.zip), not two
 - Status: accepted
 - Context: The diagram has the skill shipping twice from one source dir — `@scope/skill` on npm for agents and CI, and `skill.zip` from GitHub Releases for manual upload into the Claude UI. We already replaced npm with NuGet for the code surfaces, but a skill is pure markdown, so a NuGet package is not its natural agent-facing channel either — nothing would `dotnet tool install` a folder of prose.
