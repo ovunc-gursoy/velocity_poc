@@ -11,5 +11,6 @@
          Drop this line once Microsoft.Data.Sqlite ships with 2.1.12 or later of its own accord. -->
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
   </ItemGroup>
 </Project>

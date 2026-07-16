@@ -9,14 +9,18 @@
 |---|---|---|---|
 | `Velocity.Mcp.Core` | Tool contracts, validation, mapping, auth context. One implementation behind every surface. | `src/Velocity.Mcp.Core/` | **built** |
 | `Velocity.Mcp.Server` | Remote MCP, streamable HTTP. The only surface behind a network + OAuth boundary. | `src/Velocity.Mcp.Server/Program.cs` | **built** |
-| `Velocity.Mcp.Local` | Local MCP over stdio, runs on the dev machine as the user. | — | phase 3 |
-| `Velocity.Mcp.Cli` | dotnet tool for scripts/CI. Also `mcp install` → writes/merges `.mcp.json`. | — | phase 3 |
+| `Velocity.Mcp.Local` | Local MCP over stdio, runs on the dev machine as the user. | `src/Velocity.Mcp.Local/Program.cs` | **built** |
+| `Velocity.Mcp.Cli` | dotnet tool for scripts/CI. Also `mcp install` → writes/merges `.mcp.json`. | `src/Velocity.Mcp.Cli/` | **built** |
 | Skill | Prompt + docs. Ships as `skill.zip` via GitHub Releases. No C#. | — | phase 4 |
 
 ### Inside core
 - `WorldCupTools` / `CurrencyTools` — the two `[McpServerToolType]` contracts. The `[Description]` strings are the agent-facing interface.
 - `WorldCupDb` — in-memory SQLite, seeded from embedded `worldcup.sql` at construction. Singleton.
 - `ServiceCollectionExtensions.AddVelocityCore()` — the single registration entry point every surface calls.
+
+### Surface notes
+- **Local MCP:** stdout *is* the JSON-RPC channel. All logging is redirected to stderr in `Program.cs`; a stray `Console.WriteLine` there corrupts the stream and the client drops the connection.
+- **CLI:** calls core in-process, same as the MCP surfaces — `velocity convert` and the `convert_currency` tool run identical code. `mcp install` merges into `.mcp.json` via `JsonNode` so unrelated servers and unknown keys survive; it refuses to touch a malformed file rather than overwrite it.
 
 ## Data flow
 - Tool call → core tool method → either `WorldCupDb` (in-process SQLite) or Frankfurter over HTTP.

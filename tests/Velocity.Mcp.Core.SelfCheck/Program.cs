@@ -1,5 +1,7 @@
 using static Expect;
+using System.Text.Json.Nodes;
 using ModelContextProtocol;
+using Velocity.Mcp.Cli;
 using Microsoft.Extensions.DependencyInjection;
 using Velocity.Mcp.Core;
 
@@ -125,7 +127,85 @@ await CheckAsync("reports an unknown-but-well-formed code clearly", async () =>
     That(error.Contains("ZZZ"), $"the message should name the offending currency, got: {error}");
 });
 
+Console.WriteLine("cli .mcp.json merge");
+
+var tempDir = Path.Combine(Path.GetTempPath(), "velocity-selfcheck-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(tempDir);
+try
+{
+    Check("install preserves a pre-existing unrelated server", () =>
+    {
+        var config = Path.Combine(tempDir, ".mcp.json");
+        File.WriteAllText(config, """
+            {
+              "mcpServers": {
+                "someone-elses": { "command": "other.exe", "args": ["--keep-me"] }
+              },
+              "unknownTopLevelKey": { "preserve": true }
+            }
+            """);
+
+        That(McpConfig.Install(config, "velocity", "C:/bin/velocity-mcp-local.exe"), "should report the entry as added");
+
+        var root = JsonNode.Parse(File.ReadAllText(config))!;
+        var servers = root["mcpServers"]!;
+        That(servers["someone-elses"]?["command"]?.GetValue<string>() == "other.exe", "the unrelated server must survive");
+        That(servers["someone-elses"]?["args"]?[0]?.GetValue<string>() == "--keep-me", "its args must survive");
+        That(root["unknownTopLevelKey"]?["preserve"]?.GetValue<bool>() == true, "unknown top-level keys must survive");
+        That(servers["velocity"]?["command"]?.GetValue<string>()!.EndsWith("velocity-mcp-local.exe") == true, "velocity should be registered");
+    });
+
+    Check("install is idempotent and reports a replacement", () =>
+    {
+        var config = Path.Combine(tempDir, "idempotent.json");
+        That(McpConfig.Install(config, "velocity", "a.exe"), "first install should report added");
+        That(!McpConfig.Install(config, "velocity", "b.exe"), "second install should report replaced, not added");
+        var servers = JsonNode.Parse(File.ReadAllText(config))!["mcpServers"]!;
+        That(servers["velocity"]?["command"]?.GetValue<string>() == "b.exe", "the entry should be updated in place");
+        That(servers.AsObject().Count == 1, "re-installing must not duplicate the entry");
+    });
+
+    Check("remove reverses install and leaves other servers alone", () =>
+    {
+        var config = Path.Combine(tempDir, "remove.json");
+        File.WriteAllText(config, """{ "mcpServers": { "someone-elses": { "command": "other.exe" } } }""");
+        McpConfig.Install(config, "velocity", "v.exe");
+        That(McpConfig.Remove(config, "velocity"), "remove should report it removed something");
+
+        var servers = JsonNode.Parse(File.ReadAllText(config))!["mcpServers"]!.AsObject();
+        That(!servers.ContainsKey("velocity"), "velocity should be gone");
+        That(servers.ContainsKey("someone-elses"), "the unrelated server must remain");
+        That(!McpConfig.Remove(config, "velocity"), "a second remove should report nothing to do");
+    });
+
+    Check("install creates the file when absent", () =>
+    {
+        var config = Path.Combine(tempDir, "nested", "new.json");
+        That(McpConfig.Install(config, "velocity", "v.exe"), "should create and add");
+        That(File.Exists(config), "the file should exist");
+    });
+
+    Check("refuses to touch a malformed config rather than clobber it", () =>
+    {
+        var config = Path.Combine(tempDir, "broken.json");
+        var original = "{ this is not json";
+        File.WriteAllText(config, original);
+        try
+        {
+            McpConfig.Install(config, "velocity", "v.exe");
+            throw new Exception("expected a refusal on malformed JSON");
+        }
+        catch (InvalidOperationException) { }
+        That(File.ReadAllText(config) == original, "the malformed file must be left exactly as it was");
+    });
+}
+finally
+{
+    Directory.Delete(tempDir, recursive: true);
+}
+
 Console.WriteLine();
+
 if (failures.Count > 0)
 {
     Console.WriteLine($"{failures.Count} check(s) failed.");

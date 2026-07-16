@@ -2,6 +2,18 @@
 
 > Append a new entry whenever a real trade-off is decided. Newest on top.
 
+## 2026-07-16 — Hand-rolled CLI arg parsing instead of System.CommandLine
+- Status: accepted
+- Context: The plan called for `System.CommandLine` (2.0.10 is now stable). The CLI has four commands.
+- Decision: Parse args by hand; a `Usage` const supplies help.
+- Consequences: No dependency and no exposure to that library's parser API churn, at the cost of tab completion, typed option validation, and generated help. Four commands do not earn it. Revisit past roughly six commands, or if completion is asked for. Marked with a `ponytail:` comment at the parse site.
+
+## 2026-07-16 — `mcp install` merges via JsonNode and refuses malformed files
+- Status: accepted
+- Context: `.mcp.json` is the user's file and generally holds other servers. A typed model would round-trip only the fields it knows about, silently dropping anything else.
+- Decision: Parse to `JsonNode`, mutate only the one entry, write back. On invalid JSON, throw rather than start from an empty object. `remove` leaves an empty `mcpServers` map rather than deleting the key or file.
+- Consequences: Unknown keys and unrelated servers survive by construction, and a corrupt config is reported instead of clobbered. Covered by self-checks, including one asserting a malformed file is left byte-for-byte unchanged.
+
 ## 2026-07-16 — Tool validation errors throw McpException, not ArgumentException
 - Status: accepted
 - Context: Phase 1 threw `ArgumentException` / `ArgumentOutOfRangeException` with messages written for an agent to self-correct. Driving the phase 2 host with a real MCP client showed the client only ever received `"An error occurred invoking 'convert_currency'."` — the SDK deliberately hides exception messages, propagating only `McpException.Message`, so nothing leaks by accident.

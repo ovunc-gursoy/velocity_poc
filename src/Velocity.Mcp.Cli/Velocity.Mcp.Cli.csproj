@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>velocity</AssemblyName>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>velocity</ToolCommandName>
+    <PackageId>Velocity.Mcp.Cli</PackageId>
+    <Description>Velocity CLI: invoke the Velocity tools from scripts and CI, and manage the local MCP server registration.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Velocity.Mcp.Core\Velocity.Mcp.Core.csproj" />
+  </ItemGroup>
+</Project>

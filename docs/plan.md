@@ -22,8 +22,8 @@ PoC of the MCP Platform Architecture (`mcp-platform-architecture.pdf`): one shar
 ## Steps
 1. [x] **Phase 1 — core.** `Velocity.Mcp.Core` with both tools, SQLite World Cup, live FX, `AddVelocityCore()`, and a self-check. Done 2026-07-16, 13/13 checks pass.
 2. [x] **Phase 2 — Remote MCP host.** `src/Velocity.Mcp.Server`, ASP.NET Minimal API, `ModelContextProtocol.AspNetCore` 1.4.1, streamable HTTP. Program.cs should be roughly: `AddVelocityCore()`, `AddMcpServer().WithHttpTransport().WithTools<WorldCupTools>().WithTools<CurrencyTools>()`, `MapMcp()`. No auth yet. Add a `/health` endpoint. Done 2026-07-16; verified against a live client (initialize, tools/list, both tools called, error paths).
-3. [ ] **Phase 3a — Local MCP (stdio).** `src/Velocity.Mcp.Local`, same binding as phase 2 but `WithStdioServerTransport()`. **Nothing may write to stdout** — stdout is the protocol channel. Route logs to stderr.
-4. [ ] **Phase 3b — CLI.** `src/Velocity.Mcp.Cli` as a dotnet tool (`PackAsTool`, command `velocity`). Subcommands: invoke each tool directly for scripts/CI, plus `velocity mcp install` / `velocity mcp remove` which write/merge/reverse the `.mcp.json` entry pointing at the phase-3a stdio binary. Merge into existing `.mcp.json` — never clobber a user's other servers. Use `System.CommandLine`.
+3. [x] **Phase 3a — Local MCP (stdio).** `src/Velocity.Mcp.Local`, same binding as phase 2 but `WithStdioServerTransport()`. **Nothing may write to stdout** — stdout is the protocol channel. Route logs to stderr. Done 2026-07-16; verified by driving it over a real stdin/stdout pipe — stdout stayed pure JSON-RPC.
+4. [x] **Phase 3b — CLI.** `src/Velocity.Mcp.Cli` as a dotnet tool (`PackAsTool`, command `velocity`). Subcommands: invoke each tool directly for scripts/CI, plus `velocity mcp install` / `velocity mcp remove` which write/merge/reverse the `.mcp.json` entry pointing at the phase-3a stdio binary. Merge into existing `.mcp.json` — never clobber a user's other servers. Done 2026-07-16. **Deviation: arg parsing is hand-rolled, not `System.CommandLine`** — see ADR.
 5. [ ] **Phase 4 — Skill.** `skills/velocity/SKILL.md` — prompt + docs describing the two tools. No C#. CI packages it to `skill.zip` for GitHub Releases.
 6. [ ] **Phase 5 — Auth.** OAuth 2.1 + PKCE on the Remote MCP surface only. Host validates access tokens via JWKS and never sees credentials; the MCP client runs the flow. **Provider not yet chosen — ask before starting.**
 7. [ ] **Phase 6 — CI.** GitHub Actions: tag → build → test → publish NuGet + attach `skill.zip` to the release.
@@ -36,7 +36,7 @@ PoC of the MCP Platform Architecture (`mcp-platform-architecture.pdf`): one shar
 | `src/Velocity.Mcp.Cli/` | new — phase 3b |
 | `skills/velocity/` | new — phase 4 |
 | `.github/workflows/` | new — phase 6 |
-| `Directory.Packages.props` | add `ModelContextProtocol.AspNetCore`, `System.CommandLine` |
+| `Directory.Packages.props` | add packages as needed |
 | `Velocity.slnx` | add each new project |
 | `docs/architecture.md`, `docs/decisions.md` | update in the same change as the code |
 
