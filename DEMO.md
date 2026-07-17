@@ -19,10 +19,15 @@ Then:
 
 - [ ] Clerk configured on the remote server (`Clerk:Authority` + `Velocity:FullAccessEmails` in user-secrets).
 - [ ] Dynamic Client Registration is **on** in the Clerk dashboard.
+- [ ] **CLI installed globally** so `velocity …` works on camera instead of `dotnet run --project …`:
+      `dotnet pack src/Velocity.Mcp.Cli -o dist && dotnet tool install --global --add-source dist Velocity.Mcp.Cli`
+      (uninstall afterwards with `dotnet tool uninstall -g Velocity.Mcp.Cli`).
+- [ ] **`.mcp.json` wired** with both servers — `velocity` (local stdio) and `velocity-remote` (http).
+      See step 3 for the install command; the remote entry is added by hand.
 - [ ] Remote server running: `ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Velocity.Mcp.Server` — confirm `curl http://localhost:5199/health` returns `{"status":"ok"}`.
 - [ ] A second Clerk test account exists (any email **not** in the allowlist) — needed for step 6.
 - [ ] An MCP client ready (Claude Code in a terminal is easiest).
-- [ ] Terminals pre-opened, font size up.
+- [ ] Terminals pre-opened, font size up. Do Not Disturb on (`Win+N`) so notifications don't crash the take.
 
 ---
 
@@ -42,8 +47,8 @@ Keep it to that. The demo makes the point better than the slide would.
 Start here because it's zero-friction and the output is immediate.
 
 ```bash
-dotnet run --project src/Velocity.Mcp.Cli -- worldcup --team Brazil
-dotnet run --project src/Velocity.Mcp.Cli -- convert 100 USD EUR
+velocity worldcup --team Brazil
+velocity convert 100 USD EUR
 ```
 
 - **They see:** Brazil's seven finals in a table; a live USD→EUR conversion with the ECB rate date.
@@ -53,7 +58,7 @@ dotnet run --project src/Velocity.Mcp.Cli -- convert 100 USD EUR
 Optional, if asked "what if I get it wrong?":
 
 ```bash
-dotnet run --project src/Velocity.Mcp.Cli -- convert 100 BANANAS EUR
+velocity convert 100 BANANAS EUR
 ```
 
 - **They see:** a precise, human-readable error naming the bad input.
@@ -65,8 +70,13 @@ dotnet run --project src/Velocity.Mcp.Cli -- convert 100 BANANAS EUR
 
 Show an AI agent actually *using* the tool, with no setup ceremony.
 
+Already wired in pre-flight, so don't run this live — just show what it wrote (`cat .mcp.json`)
+and say the CLI put it there. For reference, the command is:
+
 ```bash
-velocity mcp install      # wires the local server into .mcp.json
+# --server-path is required: a globally-installed `velocity` can't find the local server
+# beside itself, since they're separate packages.
+velocity mcp install --server-path "src/Velocity.Mcp.Local/bin/Debug/net10.0/velocity-mcp-local.exe"
 ```
 
 Open your agent (Claude Code) in this folder. Ask it, in plain English:
